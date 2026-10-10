@@ -17,7 +17,7 @@ jobs:
       - name: Checkout sizing revision
         uses: actions/checkout@v4
         with:
-          ref: 304c5e8f172e7eea59f75e6031cfcc30030972d5
+          ref: ef8d725f3d1f23c2a3003b7acf8eb63eaba9139c
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -51,5 +51,5 @@ jobs:
         run: |
           gh release create v1.3.0-cmkrause.sizing.2 dist/zen-ui.js \
             --title "v1.3.0-cmkrause.sizing.2" \
-            --target 304c5e8f172e7eea59f75e6031cfcc30030972d5 \
+            --target ef8d725f3d1f23c2a3003b7acf8eb63eaba9139c \
             --notes "Sizing test build adding optional scrollToToday behavior. Also includes zoom, card padding, and title gap controls. No statistics, dependency, or toolchain changes included."
