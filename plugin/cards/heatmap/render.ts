@@ -4,19 +4,23 @@
  * Pure rendering functions for the heatmap card.
  */
 
-import { html, svg, type TemplateResult } from 'lit'
+import { html, nothing, svg, type TemplateResult } from 'lit'
+import { ref } from 'lit/directives/ref.js'
 import type { HeatmapData } from '../../data-pipeline'
 import type { CardRenderContext } from '../types'
 import type { WeekdayLabelsMode } from '../../config'
 import { calculateGridPositions } from './grid'
 import { t } from '../../shared/localize'
-import { parseYmdDate } from '../../shared/date'
+import { formatLocalDate, parseYmdDate } from '../../shared/date'
 
 const RECT_SIZE = 10
 const GAP = 3
 const STEP = RECT_SIZE + GAP
 const X_START = 30
 const Y_START = 20
+const TODAY_SCROLL_ANCHOR = 0.8
+
+const autoScrollKeys = new WeakMap<HTMLElement, string>()
 
 export interface DayLabel {
   row: number
@@ -38,6 +42,62 @@ export function getHeatmapSvgStyle(
   const maxWidthStyle =
     weekCount < 52 ? `max-width: ${intrinsicWidth * zoom}px;` : ''
   return `${widthStyle}${maxWidthStyle}`
+}
+
+/**
+ * Calculates the horizontal scroll offset that places today's cell toward
+ * the right side of the visible viewport while preserving some future context.
+ */
+export function calculateTodayScrollLeft(
+  cellCenter: number,
+  containerWidth: number,
+  scrollWidth: number,
+  anchor = TODAY_SCROLL_ANCHOR,
+): number {
+  const maxScroll = Math.max(0, scrollWidth - containerWidth)
+  const desiredScroll = cellCenter - containerWidth * anchor
+  return Math.min(maxScroll, Math.max(0, desiredScroll))
+}
+
+function scheduleScrollToToday(
+  element: SVGRectElement,
+  context: CardRenderContext,
+  today: string,
+): void {
+  const container = element.ownerSVGElement?.closest(
+    '.graph-container',
+  ) as HTMLElement | null
+  if (!container) return
+
+  const config = context.config
+  const scrollKey = [
+    today,
+    config.range,
+    config.years,
+    config.days,
+    config.end_date ?? '',
+    config.zoom ?? 1,
+  ].join('|')
+
+  if (autoScrollKeys.get(container) === scrollKey) return
+
+  requestAnimationFrame(() => {
+    if (!element.isConnected || !container.isConnected) return
+
+    const containerRect = container.getBoundingClientRect()
+    const cellRect = element.getBoundingClientRect()
+    const cellCenter =
+      container.scrollLeft +
+      (cellRect.left - containerRect.left) +
+      cellRect.width / 2
+
+    container.scrollLeft = calculateTodayScrollLeft(
+      cellCenter,
+      container.clientWidth,
+      container.scrollWidth,
+    )
+    autoScrollKeys.set(container, scrollKey)
+  })
 }
 
 /**
@@ -99,6 +159,7 @@ export function renderYearGraph(
   showYearLabel: boolean,
 ): TemplateResult {
   const weekStart = context.config.weekStartDay === 'sunday' ? 0 : 1
+  const today = formatLocalDate(new Date())
 
   // Build month labels from the processed weeks
   const monthStartColumns = new Map<number, number>()
@@ -187,6 +248,8 @@ export function renderYearGraph(
               const color = day.missing
                 ? 'rgba(128, 128, 128, 0.02)'
                 : (colorScale[day.level] ?? colorScale[colorScale.length - 1])
+              const shouldAutoScroll =
+                context.config.scrollToToday && day.date === today
               return svg`
                 <rect
                   width="${RECT_SIZE}"
@@ -196,6 +259,14 @@ export function renderYearGraph(
                   rx="2"
                   ry="2"
                   fill="${color}"
+                  data-date="${day.date}"
+                  ${shouldAutoScroll
+                    ? ref((element) => {
+                        if (element instanceof SVGRectElement) {
+                          scheduleScrollToToday(element, context, today)
+                        }
+                      })
+                    : nothing}
                   style="cursor: pointer;"
                   @mouseenter=${(e: MouseEvent) => context.onCellMouseEnter(e, day.date, day.count, day.missing)}
                   @mouseleave=${context.onCellMouseLeave}
