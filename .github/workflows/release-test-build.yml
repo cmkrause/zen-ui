@@ -1,0 +1,47 @@
+name: Publish fork test build
+
+on:
+  push:
+    branches:
+      - perf/statistics-fetch-efficiency
+    paths:
+      - .github/workflows/release-test-build.yml
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout tested PR revision
+        uses: actions/checkout@v7
+        with:
+          ref: 300086e4be0b173ef911b60ed1de0ffc39619382
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 12.11.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Publish test release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create v1.3.0-cmkrause.1 dist/zen-ui.js \
+            --repo cmkrause/zen-ui \
+            --target 300086e4be0b173ef911b60ed1de0ffc39619382 \
+            --title "v1.3.0-cmkrause.1" \
+            --notes "Fork test build of PR #38. Built from commit 300086e4be0b173ef911b60ed1de0ffc39619382 using Node 26, pnpm 12, TypeScript 6, and Vite 8. Intended for Home Assistant/HACS testing before upstream merge."
