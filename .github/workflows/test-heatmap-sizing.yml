@@ -1,0 +1,43 @@
+name: Test heatmap sizing branch
+
+on:
+  push:
+    branches:
+      - feat/heatmap-sizing
+    paths:
+      - .github/workflows/test-heatmap-sizing.yml
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sizing revision
+        uses: actions/checkout@v4
+        with:
+          ref: 0f68fd7bcb4777fea55a50ca93d062a63f5a1b8c
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Run tests
+        run: pnpm test:run
+
+      - name: Build
+        run: pnpm build
