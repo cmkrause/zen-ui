@@ -9,6 +9,8 @@ import { css } from 'lit'
 export const baseStyles = css`
   :host {
     display: block;
+    --zen-card-padding: 20px 24px;
+    --zen-title-gap: 20px;
     /* Default GitHub Light Theme Colors */
     --gh-c-0: #ebedf0;
     --gh-c-1: #9be9a8;
@@ -38,7 +40,7 @@ export const baseStyles = css`
   }
 
   ha-card {
-    padding: 20px 24px;
+    padding: var(--zen-card-padding);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -51,7 +53,7 @@ export const baseStyles = css`
     font-size: 18px;
     font-weight: 600;
     letter-spacing: -0.02em;
-    margin-bottom: 20px;
+    margin-bottom: var(--zen-title-gap);
     color: var(--primary-text-color);
     text-align: left;
     font-family: var(
