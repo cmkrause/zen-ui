@@ -43,6 +43,7 @@ export const CONFIG_DEFAULTS = {
   attribute: 'data',
   missingMode: 'zero' as MissingMode,
   valueMode: 'clamp_zero' as ValueMode,
+  zoom: 1,
 } as const
 
 // Convert weekStartDay to pipeline format (0 = Sunday, 1 = Monday)
@@ -106,6 +107,40 @@ const DaysSchema = v.pipe(
       return input
     }
     return CONFIG_DEFAULTS.days
+  }),
+)
+
+// Schema for heatmap zoom (0.5x-3x). Values >1 preserve square cells by
+// rendering the SVG wider than the card; the graph container then scrolls.
+const ZoomSchema = v.pipe(
+  v.unknown(),
+  v.transform((input) => {
+    if (
+      typeof input === 'number' &&
+      Number.isFinite(input) &&
+      input >= 0.5 &&
+      input <= 3
+    ) {
+      return input
+    }
+    return CONFIG_DEFAULTS.zoom
+  }),
+)
+
+// Schema for uniform card padding override in pixels. Omitted preserves the
+// legacy 20px vertical / 24px horizontal padding.
+const CardPaddingSchema = v.pipe(
+  v.unknown(),
+  v.transform((input): number | undefined => {
+    if (
+      typeof input === 'number' &&
+      Number.isInteger(input) &&
+      input >= 0 &&
+      input <= 48
+    ) {
+      return input
+    }
+    return undefined
   }),
 )
 
@@ -268,6 +303,8 @@ const HeatmapConfigSchema = v.pipe(
     baseColor: v.optional(BaseColorSchema, CONFIG_DEFAULTS.baseColor),
     unit: v.optional(v.string()),
     backgroundColor: v.optional(v.string()),
+    zoom: v.optional(ZoomSchema, CONFIG_DEFAULTS.zoom),
+    cardPadding: v.optional(CardPaddingSchema),
 
     // Diverging color scheme (both required for diverging mode)
     negativeColor: v.optional(OptionalHexColorSchema),
