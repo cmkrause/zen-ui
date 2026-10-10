@@ -13,14 +13,17 @@ import {
 import { validateConfig, weekStartDayToNumber, type CardConfig } from './config'
 import { baseStyles } from './shared/styles'
 import { t } from './shared/localize'
+import { formatLocalDate } from './shared/date'
 import { getCardRenderer, getAllCardStyles } from './cards/registry'
 import type { Tooltip, CardRenderContext } from './cards/types'
 import {
   fetchStatistics,
   aggregateStatistics,
   getAttributeData,
+  shouldFetchStatistics,
   type DataPoint,
   type Hass,
+  type StatisticsType,
 } from './data-sources'
 
 // Injected by Vite at build time from package.json
@@ -68,6 +71,8 @@ export class ZenUI extends LitElement {
   private _darkModeMediaQuery?: MediaQueryList
   private _darkModeObserver?: MutationObserver
   private _lastFetchKey?: string
+  private _lastFetchAt?: number
+  private _lastFetchDay?: string
 
   static styles = [baseStyles, ...getAllCardStyles()]
 
@@ -183,17 +188,42 @@ export class ZenUI extends LitElement {
     return `${c.entity}|${c.range}|${c.years}|${c.days}|${c.end_date ?? ''}`
   }
 
-  private _fetchHistoryIfNeeded(): void {
-    if (!this._config?.entity || !this.hass) return
+  private _getAttributeData(): DataPoint[] {
+    if (!this._config?.entity || !this.hass) return []
 
-    const key = this._getFetchKey()
-    if (this._lastFetchKey === key) return
-
-    this._lastFetchKey = key
-    this._fetchStatistics()
+    return getAttributeData(this.hass, {
+      entityId: this._config.entity,
+      attribute: this._config.attribute || 'data',
+    })
   }
 
-  private async _fetchStatistics(): Promise<void> {
+  private _fetchHistoryIfNeeded(): void {
+    if (!this._config?.entity || !this.hass || this._loading) return
+
+    const attributeData = this._getAttributeData()
+    const key = this._getFetchKey()
+    const now = new Date()
+
+    if (
+      !shouldFetchStatistics({
+        hasAttributeData: attributeData.length > 0,
+        fetchKey: key,
+        lastFetchKey: this._lastFetchKey,
+        lastFetchAt: this._lastFetchAt,
+        lastFetchDay: this._lastFetchDay,
+        now,
+      })
+    ) {
+      return
+    }
+
+    this._fetchStatistics(key, now)
+  }
+
+  private async _fetchStatistics(
+    fetchKey: string,
+    fetchedAt: Date,
+  ): Promise<void> {
     if (!this._config?.entity || !this.hass) return
 
     // Skip if hass.callWS is not available (e.g., demo mode)
@@ -208,6 +238,7 @@ export class ZenUI extends LitElement {
       const ranges = calculateDateRanges(pipelineConfig)
       const startDate = ranges[0].startDate
       const endDate = ranges[ranges.length - 1].endDate
+      const statisticsType = this._getStatisticsType()
 
       // Use statistics API for long-term data (not limited by purge_keep_days)
       const statistics = await fetchStatistics(this.hass, {
@@ -215,11 +246,13 @@ export class ZenUI extends LitElement {
         startDate,
         endDate,
         period: 'day',
+        statisticsType,
       })
 
-      // Pick statistics type based on sensor's state_class
-      const statisticsType = this._getStatisticsType()
       this._historyData = aggregateStatistics(statistics, statisticsType)
+      this._lastFetchKey = fetchKey
+      this._lastFetchAt = fetchedAt.getTime()
+      this._lastFetchDay = formatLocalDate(fetchedAt)
     } catch (err) {
       console.error('Failed to fetch statistics:', err)
       this._error = 'Failed to load statistics data'
@@ -229,7 +262,7 @@ export class ZenUI extends LitElement {
     }
   }
 
-  private _getStatisticsType(): 'max' | 'mean' | 'change' | 'state' {
+  private _getStatisticsType(): StatisticsType {
     if (!this._config?.entity || !this.hass) return 'max'
 
     const stateObj = this.hass.states[this._config.entity]
@@ -253,14 +286,9 @@ export class ZenUI extends LitElement {
     }
 
     // Check for data in entity attribute first (for custom sensors with data attribute)
-    if (this.hass) {
-      const attributeData = getAttributeData(this.hass, {
-        entityId: this._config.entity,
-        attribute: this._config.attribute || 'data',
-      })
-      if (attributeData.length > 0) {
-        return attributeData
-      }
+    const attributeData = this._getAttributeData()
+    if (attributeData.length > 0) {
+      return attributeData
     }
 
     // Use fetched history data
