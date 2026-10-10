@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { validateConfig, CONFIG_DEFAULTS } from './config'
-import { getHeatmapSvgStyle } from './cards/heatmap/render'
+import {
+  calculateTodayScrollLeft,
+  getHeatmapSvgStyle,
+} from './cards/heatmap/render'
 
 const baseConfig = {
   entity: 'sensor.test',
@@ -12,6 +15,7 @@ describe('heatmap sizing config', () => {
     const config = validateConfig(baseConfig)
 
     expect(config.zoom).toBe(CONFIG_DEFAULTS.zoom)
+    expect(config.scrollToToday).toBe(CONFIG_DEFAULTS.scrollToToday)
     expect(config.cardPadding).toBeUndefined()
     expect(config.titleGap).toBeUndefined()
   })
@@ -26,6 +30,12 @@ describe('heatmap sizing config', () => {
     expect(validateConfig({ ...baseConfig, zoom: 0.49 }).zoom).toBe(1)
     expect(validateConfig({ ...baseConfig, zoom: 3.01 }).zoom).toBe(1)
     expect(validateConfig({ ...baseConfig, zoom: 'large' }).zoom).toBe(1)
+  })
+
+  it('accepts scroll-to-today when enabled', () => {
+    expect(
+      validateConfig({ ...baseConfig, scrollToToday: true }).scrollToToday,
+    ).toBe(true)
   })
 
   it('accepts compact padding and title-gap overrides including zero', () => {
@@ -62,5 +72,19 @@ describe('heatmap SVG sizing', () => {
 
   it('scales the max-width cap for shorter ranges', () => {
     expect(getHeatmapSvgStyle(10, 165, 2)).toBe('width: 200%;max-width: 330px;')
+  })
+})
+
+describe('heatmap today scrolling', () => {
+  it('places today near the right side of the viewport', () => {
+    expect(calculateTodayScrollLeft(900, 400, 1200)).toBe(580)
+  })
+
+  it('clamps before the beginning', () => {
+    expect(calculateTodayScrollLeft(100, 400, 1200)).toBe(0)
+  })
+
+  it('clamps at the maximum scroll position', () => {
+    expect(calculateTodayScrollLeft(1180, 400, 1200)).toBe(800)
   })
 })
