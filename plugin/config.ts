@@ -127,9 +127,9 @@ const ZoomSchema = v.pipe(
   }),
 )
 
-// Schema for uniform card padding override in pixels. Omitted preserves the
-// legacy 20px vertical / 24px horizontal padding.
-const CardPaddingSchema = v.pipe(
+// Shared schema for compact-layout pixel overrides. Omitted or invalid values
+// preserve the legacy styles.
+const OptionalPixelSchema = v.pipe(
   v.unknown(),
   v.transform((input): number | undefined => {
     if (
@@ -304,7 +304,8 @@ const HeatmapConfigSchema = v.pipe(
     unit: v.optional(v.string()),
     backgroundColor: v.optional(v.string()),
     zoom: v.optional(ZoomSchema, CONFIG_DEFAULTS.zoom),
-    cardPadding: v.optional(CardPaddingSchema),
+    cardPadding: v.optional(OptionalPixelSchema),
+    titleGap: v.optional(OptionalPixelSchema),
 
     // Diverging color scheme (both required for diverging mode)
     negativeColor: v.optional(OptionalHexColorSchema),
