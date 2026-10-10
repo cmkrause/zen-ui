@@ -61,8 +61,6 @@ describe('heatmap SVG sizing', () => {
   })
 
   it('scales the max-width cap for shorter ranges', () => {
-    expect(getHeatmapSvgStyle(10, 165, 2)).toBe(
-      'width: 200%;max-width: 330px;',
-    )
+    expect(getHeatmapSvgStyle(10, 165, 2)).toBe('width: 200%;max-width: 330px;')
   })
 })

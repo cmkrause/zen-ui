@@ -160,8 +160,8 @@ export function renderYearGraph(
       ? html`<style>
           :host {
             ${cardPadding !== undefined
-              ? `--zen-card-padding: ${cardPadding}px;`
-              : ''}
+            ? `--zen-card-padding: ${cardPadding}px;`
+            : ''}
             ${titleGap !== undefined ? `--zen-title-gap: ${titleGap}px;` : ''}
           }
         </style>`
