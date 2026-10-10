@@ -220,7 +220,10 @@ export class ZenUI extends LitElement {
     this._fetchStatistics(key, now)
   }
 
-  private async _fetchStatistics(fetchKey: string, fetchedAt: Date): Promise<void> {
+  private async _fetchStatistics(
+    fetchKey: string,
+    fetchedAt: Date,
+  ): Promise<void> {
     if (!this._config?.entity || !this.hass) return
 
     // Skip if hass.callWS is not available (e.g., demo mode)

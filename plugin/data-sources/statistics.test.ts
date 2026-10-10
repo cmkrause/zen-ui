@@ -183,9 +183,7 @@ describe('aggregateStatistics', () => {
     const result = aggregateStatistics(stats, 'max')
 
     expect(result).toHaveLength(1)
-    expect(result[0].date).toBe(
-      toLocalDateString('2025-01-27T11:00:00.000Z')!,
-    )
+    expect(result[0].date).toBe(toLocalDateString('2025-01-27T11:00:00.000Z')!)
     expect(result[0].count).toBe(40)
   })
 
