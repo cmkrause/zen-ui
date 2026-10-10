@@ -260,13 +260,15 @@ export function renderYearGraph(
                   ry="2"
                   fill="${color}"
                   data-date="${day.date}"
-                  ${shouldAutoScroll
-                    ? ref((element) => {
-                        if (element instanceof SVGRectElement) {
-                          scheduleScrollToToday(element, context, today)
-                        }
-                      })
-                    : nothing}
+                  ${
+                    shouldAutoScroll
+                      ? ref((element) => {
+                          if (element instanceof SVGRectElement) {
+                            scheduleScrollToToday(element, context, today)
+                          }
+                        })
+                      : nothing
+                  }
                   style="cursor: pointer;"
                   @mouseenter=${(e: MouseEvent) => context.onCellMouseEnter(e, day.date, day.count, day.missing)}
                   @mouseleave=${context.onCellMouseLeave}
