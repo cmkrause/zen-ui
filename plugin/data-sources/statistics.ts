@@ -7,10 +7,12 @@
  */
 
 import type { Hass, DataPoint } from './types'
-import { toLocalDateString } from '../shared/date'
+import { formatLocalDate, toLocalDateString } from '../shared/date'
 
 export type StatisticsPeriod = '5minute' | 'hour' | 'day' | 'week' | 'month'
 export type StatisticsType = 'mean' | 'min' | 'max' | 'sum' | 'state' | 'change'
+
+export const STATISTICS_CACHE_TTL_MS = 60 * 60 * 1000
 
 export interface StatisticsValue {
   statistic_id: string
@@ -33,6 +35,53 @@ export interface FetchStatisticsOptions {
   statisticsType?: StatisticsType
 }
 
+export interface StatisticsFetchDecisionOptions {
+  hasAttributeData: boolean
+  fetchKey: string
+  lastFetchKey?: string
+  lastFetchAt?: number
+  lastFetchDay?: string
+  now?: Date
+}
+
+/**
+ * Returns true when a cached statistics response can still be reused.
+ * Cache entries expire after one hour and are never reused across local days.
+ */
+export function isStatisticsCacheFresh(
+  lastFetchAt: number | undefined,
+  lastFetchDay: string | undefined,
+  now: Date = new Date(),
+): boolean {
+  if (lastFetchAt === undefined || lastFetchDay === undefined) return false
+
+  const nowMs = now.getTime()
+  if (!Number.isFinite(lastFetchAt) || nowMs < lastFetchAt) return false
+
+  return (
+    nowMs - lastFetchAt < STATISTICS_CACHE_TTL_MS &&
+    lastFetchDay === formatLocalDate(now)
+  )
+}
+
+/**
+ * Determines whether the card should request recorder statistics.
+ * Attribute data is preferred, and an unchanged statistics request is cached.
+ */
+export function shouldFetchStatistics({
+  hasAttributeData,
+  fetchKey,
+  lastFetchKey,
+  lastFetchAt,
+  lastFetchDay,
+  now = new Date(),
+}: StatisticsFetchDecisionOptions): boolean {
+  if (hasAttributeData) return false
+  if (lastFetchKey !== fetchKey) return true
+
+  return !isStatisticsCacheFresh(lastFetchAt, lastFetchDay, now)
+}
+
 /**
  * Fetches long-term statistics from Home Assistant via WebSocket
  */
@@ -40,15 +89,29 @@ export async function fetchStatistics(
   hass: Hass,
   options: FetchStatisticsOptions,
 ): Promise<StatisticsValue[]> {
-  const { entityId, startDate, endDate, period = 'day' } = options
+  const {
+    entityId,
+    startDate,
+    endDate,
+    period = 'day',
+    statisticsType,
+  } = options
 
-  const result = await hass.callWS({
+  const request: Record<string, unknown> = {
     type: 'recorder/statistics_during_period',
     start_time: startDate.toISOString(),
     end_time: endDate.toISOString(),
     statistic_ids: [entityId],
     period,
-  })
+  }
+
+  // Home Assistant supports filtering the returned statistic fields. Requesting
+  // only what the card needs reduces recorder work and WebSocket payload size.
+  if (statisticsType) {
+    request.types = [statisticsType]
+  }
+
+  const result = await hass.callWS(request)
 
   const statistics = result as Record<string, StatisticsValue[]>
 
