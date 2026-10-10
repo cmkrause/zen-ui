@@ -198,7 +198,7 @@ export class ZenUI extends LitElement {
   }
 
   private _fetchHistoryIfNeeded(): void {
-    if (!this._config?.entity || !this.hass) return
+    if (!this._config?.entity || !this.hass || this._loading) return
 
     const attributeData = this._getAttributeData()
     const key = this._getFetchKey()
@@ -217,13 +217,10 @@ export class ZenUI extends LitElement {
       return
     }
 
-    this._lastFetchKey = key
-    this._lastFetchAt = now.getTime()
-    this._lastFetchDay = formatLocalDate(now)
-    this._fetchStatistics()
+    this._fetchStatistics(key, now)
   }
 
-  private async _fetchStatistics(): Promise<void> {
+  private async _fetchStatistics(fetchKey: string, fetchedAt: Date): Promise<void> {
     if (!this._config?.entity || !this.hass) return
 
     // Skip if hass.callWS is not available (e.g., demo mode)
@@ -250,6 +247,9 @@ export class ZenUI extends LitElement {
       })
 
       this._historyData = aggregateStatistics(statistics, statisticsType)
+      this._lastFetchKey = fetchKey
+      this._lastFetchAt = fetchedAt.getTime()
+      this._lastFetchDay = formatLocalDate(fetchedAt)
     } catch (err) {
       console.error('Failed to fetch statistics:', err)
       this._error = 'Failed to load statistics data'
