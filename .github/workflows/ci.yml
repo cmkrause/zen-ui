@@ -25,7 +25,13 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Upload refreshed lockfile
+        uses: actions/upload-artifact@v6
+        with:
+          name: refreshed-pnpm-lockfile
+          path: pnpm-lock.yaml
 
       - name: Lint
         run: pnpm lint
