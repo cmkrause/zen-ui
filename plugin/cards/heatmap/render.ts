@@ -24,6 +24,23 @@ export interface DayLabel {
 }
 
 /**
+ * Returns inline SVG sizing that preserves the heatmap aspect ratio.
+ * A zoom above 1 intentionally renders wider than the card so the existing
+ * horizontal overflow container can scroll while keeping cells square.
+ */
+export function getHeatmapSvgStyle(
+  weekCount: number,
+  intrinsicWidth: number,
+  zoom = 1,
+): string {
+  const width = zoom * 100
+  const widthStyle = zoom === 1 ? '' : `width: ${width}%;`
+  const maxWidthStyle =
+    weekCount < 52 ? `max-width: ${intrinsicWidth * zoom}px;` : ''
+  return `${widthStyle}${maxWidthStyle}`
+}
+
+/**
  * Gets the localized day label for a given day index.
  * dayIndex: 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
  */
@@ -126,6 +143,8 @@ export function renderYearGraph(
 
   const width = heatmapData.weeks.length * STEP - GAP
   const height = 7 * STEP - GAP
+  const intrinsicWidth = X_START + width + 5
+  const zoom = context.config.zoom ?? 1
 
   const dayLabels = generateDayLabels(
     context.config.weekdayLabels,
@@ -134,15 +153,31 @@ export function renderYearGraph(
   )
 
   const yearLabel = heatmapData.range.label || ''
+  const cardPadding = context.config.cardPadding
+  const titleGap = context.config.titleGap
+  const spacingOverrides =
+    cardPadding !== undefined || titleGap !== undefined
+      ? html`<style>
+          :host {
+            ${cardPadding !== undefined
+              ? `--zen-card-padding: ${cardPadding}px;`
+              : ''}
+            ${titleGap !== undefined ? `--zen-title-gap: ${titleGap}px;` : ''}
+          }
+        </style>`
+      : ''
 
   return html`
+    ${spacingOverrides}
     <div class="year-graph">
       ${showYearLabel ? html`<div class="year-label">${yearLabel}</div>` : ''}
       <svg
-        viewBox="0 0 ${X_START + width + 5} ${Y_START + height + 2}"
-        style="${heatmapData.weeks.length < 52
-          ? `max-width: ${X_START + width + 5}px;`
-          : ''}"
+        viewBox="0 0 ${intrinsicWidth} ${Y_START + height + 2}"
+        style="${getHeatmapSvgStyle(
+          heatmapData.weeks.length,
+          intrinsicWidth,
+          zoom,
+        )}"
       >
         <g transform="translate(${X_START}, ${Y_START})">
           ${labels}
