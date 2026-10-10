@@ -1,0 +1,37 @@
+name: Format heatmap sizing change
+
+on:
+  push:
+    branches:
+      - feat/heatmap-sizing
+    paths:
+      - .github/workflows/format-heatmap-sizing.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/heatmap-sizing
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm prettier --write plugin/cards/heatmap/render.ts
+      - name: Commit formatting if needed
+        run: |
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add plugin/cards/heatmap/render.ts
+            git commit -m "style: format scroll-to-today implementation"
+            git push origin HEAD:feat/heatmap-sizing
+          fi
