@@ -1,6 +1,134 @@
-import { describe, it, expect } from 'vitest'
-import { aggregateStatistics, type StatisticsValue } from './statistics'
+import { describe, it, expect, vi } from 'vitest'
+import {
+  aggregateStatistics,
+  fetchStatistics,
+  isStatisticsCacheFresh,
+  shouldFetchStatistics,
+  STATISTICS_CACHE_TTL_MS,
+  type StatisticsValue,
+} from './statistics'
 import { toLocalDateString } from '../shared/date'
+import type { Hass } from './types'
+
+function makeHass(callWS = vi.fn()): Hass {
+  return {
+    states: {},
+    callApi: vi.fn(),
+    callWS,
+  }
+}
+
+describe('fetchStatistics', () => {
+  it('requests only the configured statistic type', async () => {
+    const callWS = vi.fn().mockResolvedValue({ 'sensor.test': [] })
+    const hass = makeHass(callWS)
+    const startDate = new Date('2026-01-01T00:00:00Z')
+    const endDate = new Date('2026-01-31T00:00:00Z')
+
+    await fetchStatistics(hass, {
+      entityId: 'sensor.test',
+      startDate,
+      endDate,
+      period: 'day',
+      statisticsType: 'max',
+    })
+
+    expect(callWS).toHaveBeenCalledWith({
+      type: 'recorder/statistics_during_period',
+      start_time: startDate.toISOString(),
+      end_time: endDate.toISOString(),
+      statistic_ids: ['sensor.test'],
+      period: 'day',
+      types: ['max'],
+    })
+  })
+
+  it('omits the types filter when no statistic type is provided', async () => {
+    const callWS = vi.fn().mockResolvedValue({ 'sensor.test': [] })
+    const hass = makeHass(callWS)
+    const startDate = new Date('2026-01-01T00:00:00Z')
+    const endDate = new Date('2026-01-31T00:00:00Z')
+
+    await fetchStatistics(hass, {
+      entityId: 'sensor.test',
+      startDate,
+      endDate,
+    })
+
+    expect(callWS).toHaveBeenCalledWith({
+      type: 'recorder/statistics_during_period',
+      start_time: startDate.toISOString(),
+      end_time: endDate.toISOString(),
+      statistic_ids: ['sensor.test'],
+      period: 'day',
+    })
+  })
+})
+
+describe('statistics fetch caching', () => {
+  const now = new Date(2026, 9, 9, 12, 0, 0)
+  const today = '2026-10-09'
+
+  it('treats a recent same-day fetch as fresh', () => {
+    expect(
+      isStatisticsCacheFresh(now.getTime() - 30 * 60 * 1000, today, now),
+    ).toBe(true)
+  })
+
+  it('expires the cache after one hour', () => {
+    expect(
+      isStatisticsCacheFresh(
+        now.getTime() - STATISTICS_CACHE_TTL_MS,
+        today,
+        now,
+      ),
+    ).toBe(false)
+  })
+
+  it('expires the cache when the local calendar day changes', () => {
+    expect(
+      isStatisticsCacheFresh(now.getTime() - 5 * 60 * 1000, '2026-10-08', now),
+    ).toBe(false)
+  })
+
+  it('skips recorder statistics when valid attribute data exists', () => {
+    expect(
+      shouldFetchStatistics({
+        hasAttributeData: true,
+        fetchKey: 'sensor.test|rolling|1|364|',
+        now,
+      }),
+    ).toBe(false)
+  })
+
+  it('fetches immediately when the request key changes', () => {
+    expect(
+      shouldFetchStatistics({
+        hasAttributeData: false,
+        fetchKey: 'sensor.test|rolling|1|30|',
+        lastFetchKey: 'sensor.test|rolling|1|364|',
+        lastFetchAt: now.getTime(),
+        lastFetchDay: today,
+        now,
+      }),
+    ).toBe(true)
+  })
+
+  it('reuses a recent same-day request with an unchanged key', () => {
+    const key = 'sensor.test|rolling|1|364|'
+
+    expect(
+      shouldFetchStatistics({
+        hasAttributeData: false,
+        fetchKey: key,
+        lastFetchKey: key,
+        lastFetchAt: now.getTime() - 30 * 60 * 1000,
+        lastFetchDay: today,
+        now,
+      }),
+    ).toBe(false)
+  })
+})
 
 describe('aggregateStatistics', () => {
   it('returns empty array for empty input', () => {
@@ -17,7 +145,7 @@ describe('aggregateStatistics', () => {
     const stats: StatisticsValue[] = [
       {
         statistic_id: 'sensor.test',
-        start: 1737982800000, // 2025-01-27T11:00:00.000Z
+        start: 1737982800000,
         end: 1738069200000,
         mean: null,
         min: null,
@@ -109,7 +237,7 @@ describe('aggregateStatistics', () => {
         end: 1738069200000,
         mean: null,
         min: null,
-        max: null, // null - should be skipped
+        max: null,
         sum: 100,
         state: 500,
         change: 50,
@@ -126,7 +254,7 @@ describe('aggregateStatistics', () => {
     const stats: StatisticsValue[] = [
       {
         statistic_id: 'sensor.test',
-        start: 1738069200000, // 2025-01-28
+        start: 1738069200000,
         end: 1738155600000,
         mean: null,
         min: null,
@@ -138,7 +266,7 @@ describe('aggregateStatistics', () => {
       },
       {
         statistic_id: 'sensor.test',
-        start: 1737982800000, // 2025-01-27
+        start: 1737982800000,
         end: 1738069200000,
         mean: null,
         min: null,
