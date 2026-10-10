@@ -44,6 +44,7 @@ export const CONFIG_DEFAULTS = {
   missingMode: 'zero' as MissingMode,
   valueMode: 'clamp_zero' as ValueMode,
   zoom: 1,
+  scrollToToday: false,
 } as const
 
 // Convert weekStartDay to pipeline format (0 = Sunday, 1 = Monday)
@@ -304,6 +305,7 @@ const HeatmapConfigSchema = v.pipe(
     unit: v.optional(v.string()),
     backgroundColor: v.optional(v.string()),
     zoom: v.optional(ZoomSchema, CONFIG_DEFAULTS.zoom),
+    scrollToToday: v.optional(v.boolean(), CONFIG_DEFAULTS.scrollToToday),
     cardPadding: v.optional(OptionalPixelSchema),
     titleGap: v.optional(OptionalPixelSchema),
 
